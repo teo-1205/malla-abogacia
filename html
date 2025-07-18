@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Malla Curricular - Abogacía UNS</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    .year {
+      margin-bottom: 30px;
+    }
+    .year h2 {
+      background-color: #34495e;
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .cuatrimestre {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .materia {
+      background-color: #ecf0f1;
+      padding: 10px;
+      border-radius: 8px;
+      border-left: 6px solid #2980b9;
+      cursor: pointer;
+      transition: transform 0.2s;
+      position: relative;
+    }
+    .materia:hover {
+      transform: scale(1.02);
+    }
+    .materia.aprobada {
+      background-color: #d4efdf;
+      border-left-color: #27ae60;
+    }
+    .materia.bloqueada {
+      background-color: #f9e79f;
+      border-left-color: #f1c40f;
+      cursor: not-allowed;
+    }
+    .tooltip {
+      visibility: hidden;
+      background-color: rgba(0,0,0,0.8);
+      color: #fff;
+      text-align: center;
+      border-radius: 4px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: pre-line;
+      width: 200px;
+    }
+    .materia:hover .tooltip {
+      visibility: visible;
+    }
+  </style>
+</head>
+<body>
+  <h1>Malla Curricular - Abogacía (UNS)</h1>
+  <div id="malla"></div>
+
+  <script>
+    const materias = [
+      // Solo un ejemplo, el resto se completará igual
+      {
+        id: "9001",
+        nombre: "INTRODUCCION AL DERECHO",
+        anio: 1,
+        cuatrimestre: 1,
+        correlativas: [],
+        cargaHoraria: "96hs."
+      },
+      {
+        id: "9004",
+        nombre: "DERECHO PRIVADO - PARTE GENERAL",
+        anio: 1,
+        cuatrimestre: 2,
+        correlativas: ["9001"],
+        requisitos: {
+          cursada: ["9001"],
+          rendir: ["9001"]
+        },
+        cargaHoraria: "96hs."
+      },
+      {
+        id: "9005",
+        nombre: "DERECHO CONSTITUCIONAL",
+        anio: 2,
+        cuatrimestre: 1,
+        correlativas: ["4675", "9001"],
+        requisitos: {
+          cursada: ["9001"],
+          rendir: ["4675", "9001"]
+        },
+        cargaHoraria: "96hs."
+      },
+      // Agregar más materias según el plan
+    ];
+
+    const aprobadas = JSON.parse(localStorage.getItem("materiasAprobadas") || "[]");
+
+    function esBloqueada(m) {
+      if (!m.requisitos) return false;
+      const { cursada = [], rendir = [] } = m.requisitos;
+      const faltaCursar = cursada.filter(c => !aprobadas.includes(c));
+      const faltaRendir = rendir.filter(r => !aprobadas.includes(r));
+      return faltaCursar.length || faltaRendir.length;
+    }
+
+    function getTooltip(m) {
+      if (!m.requisitos) return "";
+      const { cursada = [], rendir = [] } = m.requisitos;
+      const faltaCursar = cursada.filter(c => !aprobadas.includes(c));
+      const faltaRendir = rendir.filter(r => !aprobadas.includes(r));
+      let msg = "";
+      if (faltaCursar.length) msg += "Para cursar:\n" + faltaCursar.join(", ") + "\n";
+      if (faltaRendir.length) msg += "Para rendir:\n" + faltaRendir.join(", ");
+      return msg.trim();
+    }
+
+    function render() {
+      const container = document.getElementById("malla");
+      container.innerHTML = "";
+      const agrupadas = {};
+      for (const m of materias) {
+        const key = `Año ${m.anio}`;
+        if (!agrupadas[key]) agrupadas[key] = { anio: m.anio, materias: [] };
+        agrupadas[key].materias.push(m);
+      }
+
+      Object.entries(agrupadas).sort((a,b) => a[1].anio - b[1].anio).forEach(([titulo, data]) => {
+        const yearDiv = document.createElement("div");
+        yearDiv.className = "year";
+        const h2 = document.createElement("h2");
+        h2.textContent = titulo;
+        yearDiv.appendChild(h2);
+
+        const cuatriDiv = document.createElement("div");
+        cuatriDiv.className = "cuatrimestre";
+
+        for (const m of data.materias) {
+          const div = document.createElement("div");
+          div.className = "materia";
+          if (aprobadas.includes(m.id)) {
+            div.classList.add("aprobada");
+          } else if (esBloqueada(m)) {
+            div.classList.add("bloqueada");
+            const tooltip = document.createElement("div");
+            tooltip.className = "tooltip";
+            tooltip.textContent = getTooltip(m);
+            div.appendChild(tooltip);
+          }
+          div.innerHTML += `<strong>${m.nombre}</strong><br><small>${m.cargaHoraria}</small>`;
+          div.addEventListener("click", () => {
+            if (esBloqueada(m)) return;
+            const idx = aprobadas.indexOf(m.id);
+            if (idx >= 0) aprobadas.splice(idx, 1);
+            else aprobadas.push(m.id);
+            localStorage.setItem("materiasAprobadas", JSON.stringify(aprobadas));
+            render();
+          });
+          cuatriDiv.appendChild(div);
+        }
+        yearDiv.appendChild(cuatriDiv);
+        container.appendChild(yearDiv);
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>
